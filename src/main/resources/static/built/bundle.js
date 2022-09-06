@@ -34116,6 +34116,8 @@ var ReactDOM = __webpack_require__(/*! react-dom */ "./node_modules/react-dom/in
 
 var client = __webpack_require__(/*! ./client */ "./src/main/js/client.js");
 
+var root = '/api';
+
 var App = /*#__PURE__*/function (_React$Component) {
   _inherits(App, _React$Component);
 
@@ -34137,14 +34139,81 @@ var App = /*#__PURE__*/function (_React$Component) {
   _createClass(App, [{
     key: "componentDidMount",
     value: function componentDidMount() {
+      this.loadFromServer(this.state.pageSize);
+    }
+  }, {
+    key: "loadFromServer",
+    value: function loadFromServer(pageSize) {
       var _this2 = this;
+
+      follow(client, root, [{
+        rel: 'employees',
+        params: {
+          size: pageSize
+        }
+      }]).then(function (employeeCollection) {
+        return client({
+          method: 'GET',
+          path: employeeCollection.entity._links.profile.href,
+          headers: {
+            'Accept': 'application/schema+json'
+          }
+        }).then(function (schema) {
+          _this2.schema = schema.entity;
+          return employeeCollection;
+        });
+      }).done(function (employeeCollection) {
+        _this2.setState({
+          employees: employeeCollection.entity._embedded.employees,
+          attributes: Object.keys(_this2.schema.properties),
+          pageSize: pageSize,
+          links: employeeCollection.entity._links
+        });
+      });
+    }
+  }, {
+    key: "onCreate",
+    value: function onCreate(newEmployee) {
+      var _this3 = this;
+
+      follow(client, root, ['employees']).then(function (employeeCollection) {
+        return client({
+          method: 'POST',
+          path: employeeCollection.entity._links.self.href,
+          entity: newEmployee,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }).then(function (response) {
+        return follow(client, root, [{
+          rel: 'employees',
+          params: {
+            'size': _this3.state.pageSize
+          }
+        }]);
+      }).done(function (response) {
+        if (typeof response.entity._links.last !== "undefined") {
+          _this3.onNavigate(response.entity._links.last.href);
+        } else {
+          _this3.onNavigate(response.entity._links.self.href);
+        }
+      });
+    }
+  }, {
+    key: "onNavigate",
+    value: function onNavigate(navUri) {
+      var _this4 = this;
 
       client({
         method: 'GET',
-        path: '/api/employees'
-      }).done(function (response) {
-        _this2.setState({
-          employees: response.entity._embedded.employees
+        path: navUri
+      }).done(function (employeeCollection) {
+        _this4.setState({
+          employees: employeeCollection.entity._embedded.employees,
+          attributes: _this4.state.attributes,
+          pageSize: _this4.state.pageSize,
+          links: employeeCollection.entity._links
         });
       });
     }
@@ -34172,15 +34241,76 @@ var EmployeeList = /*#__PURE__*/function (_React$Component2) {
   }
 
   _createClass(EmployeeList, [{
+    key: "handleNavFirst",
+    value: function handleNavFirst(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.first.href);
+    }
+  }, {
+    key: "handleNavPrev",
+    value: function handleNavPrev(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.prev.href);
+    }
+  }, {
+    key: "handleNavNext",
+    value: function handleNavNext(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.next.href);
+    }
+  }, {
+    key: "handleNavLast",
+    value: function handleNavLast(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.last.href);
+    }
+  }, {
     key: "render",
     value: function render() {
+      var _this5 = this;
+
       var employees = this.props.employees.map(function (employee) {
         return /*#__PURE__*/React.createElement(Employee, {
           key: employee._links.self.href,
-          employee: employee
+          employee: employee,
+          onDelete: _this5.props.onDelete
         });
       });
-      return /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "First Name"), /*#__PURE__*/React.createElement("th", null, "Last Name"), /*#__PURE__*/React.createElement("th", null, "Description")), employees));
+      var navLinks = [];
+
+      if ("first" in this.props.links) {
+        navLinks.push( /*#__PURE__*/React.createElement("button", {
+          key: "first",
+          onClick: this.handleNavFirst
+        }, "<<"));
+      }
+
+      if ("prev" in this.props.links) {
+        navLinks.push( /*#__PURE__*/React.createElement("button", {
+          key: "prev",
+          onClick: this.handleNavPrev
+        }, "<"));
+      }
+
+      if ("next" in this.props.links) {
+        navLinks.push( /*#__PURE__*/React.createElement("button", {
+          key: "next",
+          onClick: this.handleNavNext
+        }, ">"));
+      }
+
+      if ("last" in this.props.links) {
+        navLinks.push( /*#__PURE__*/React.createElement("button", {
+          key: "last",
+          onClick: this.handleNavLast
+        }, ">>"));
+      }
+
+      return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+        ref: "pageSize",
+        defaultValue: this.props.pageSize,
+        onInput: this.handleInput
+      }), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "First Name"), /*#__PURE__*/React.createElement("th", null, "Last Name"), /*#__PURE__*/React.createElement("th", null, "Description"), /*#__PURE__*/React.createElement("th", null)), employees)), /*#__PURE__*/React.createElement("div", null, navLinks));
     }
   }]);
 
@@ -34206,6 +34336,70 @@ var Employee = /*#__PURE__*/function (_React$Component3) {
   }]);
 
   return Employee;
+}(React.Component);
+
+var CreateDialog = /*#__PURE__*/function (_React$Component4) {
+  _inherits(CreateDialog, _React$Component4);
+
+  var _super4 = _createSuper(CreateDialog);
+
+  function CreateDialog(props) {
+    var _this6;
+
+    _classCallCheck(this, CreateDialog);
+
+    _this6 = _super4.call(this, props);
+    _this6.handleSubmit = _this6.handleSubmit.bind(_assertThisInitialized(_this6));
+    return _this6;
+  }
+
+  _createClass(CreateDialog, [{
+    key: "handleSubmit",
+    value: function handleSubmit(e) {
+      var _this7 = this;
+
+      e.preventDefault();
+      var newEmployee = {};
+      this.props.attributes.forEach(function (attribute) {
+        newEmployee[attribute] = ReactDOM.findDOMNode(_this7.refs[attribute]).value.trim();
+      });
+      this.props.onCreate(newEmployee); // clear out the dialog's inputs
+
+      this.props.attributes.forEach(function (attribute) {
+        ReactDOM.findDOMNode(_this7.refs[attribute]).value = '';
+      }); // Navigate away from the dialog to hide it.
+
+      window.location = "#";
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var inputs = this.props.attributes.map(function (attribute) {
+        return /*#__PURE__*/React.createElement("p", {
+          key: attribute
+        }, /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          placeholder: attribute,
+          ref: attribute,
+          className: "field"
+        }));
+      });
+      return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("a", {
+        href: "#createEmployee"
+      }, "Create"), /*#__PURE__*/React.createElement("div", {
+        id: "createEmployee",
+        className: "modalDialog"
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("a", {
+        href: "#",
+        title: "Close",
+        className: "close"
+      }, "X"), /*#__PURE__*/React.createElement("h2", null, "Create new employee"), /*#__PURE__*/React.createElement("form", null, inputs, /*#__PURE__*/React.createElement("button", {
+        onClick: this.handleSubmit
+      }, "Create")))));
+    }
+  }]);
+
+  return CreateDialog;
 }(React.Component);
 
 ReactDOM.render( /*#__PURE__*/React.createElement(App, null), document.getElementById('react'));
