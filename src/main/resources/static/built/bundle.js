@@ -34116,6 +34116,8 @@ var ReactDOM = __webpack_require__(/*! react-dom */ "./node_modules/react-dom/in
 
 var client = __webpack_require__(/*! ./client */ "./src/main/js/client.js");
 
+var follow = __webpack_require__(/*! ./follow */ "./src/main/js/follow.js");
+
 var root = '/api';
 
 var App = /*#__PURE__*/function (_React$Component) {
@@ -34130,18 +34132,19 @@ var App = /*#__PURE__*/function (_React$Component) {
 
     _this = _super.call(this, props);
     _this.state = {
-      employees: []
+      employees: [],
+      attributes: [],
+      pageSize: 2,
+      links: {}
     };
+    _this.updatePageSize = _this.updatePageSize.bind(_assertThisInitialized(_this));
+    _this.onCreate = _this.onCreate.bind(_assertThisInitialized(_this));
+    _this.onDelete = _this.onDelete.bind(_assertThisInitialized(_this));
+    _this.onNavigate = _this.onNavigate.bind(_assertThisInitialized(_this));
     return _this;
-  } // the API invoked after React renders a component in the DOM
-
+  }
 
   _createClass(App, [{
-    key: "componentDidMount",
-    value: function componentDidMount() {
-      this.loadFromServer(this.state.pageSize);
-    }
-  }, {
     key: "loadFromServer",
     value: function loadFromServer(pageSize) {
       var _this2 = this;
@@ -34170,6 +34173,13 @@ var App = /*#__PURE__*/function (_React$Component) {
           links: employeeCollection.entity._links
         });
       });
+    }
+  }, {
+    key: "updatePageSize",
+    value: function updatePageSize(pageSize) {
+      if (pageSize !== this.state.pageSize) {
+        this.loadFromServer(pageSize);
+      }
     }
   }, {
     key: "onCreate",
@@ -34201,28 +34211,53 @@ var App = /*#__PURE__*/function (_React$Component) {
       });
     }
   }, {
+    key: "onDelete",
+    value: function onDelete(employee) {
+      var _this4 = this;
+
+      client({
+        method: 'DELETE',
+        path: employee._links.self.href
+      }).done(function (response) {
+        _this4.loadFromServer(_this4.state.pageSize);
+      });
+    }
+  }, {
     key: "onNavigate",
     value: function onNavigate(navUri) {
-      var _this4 = this;
+      var _this5 = this;
 
       client({
         method: 'GET',
         path: navUri
       }).done(function (employeeCollection) {
-        _this4.setState({
+        _this5.setState({
           employees: employeeCollection.entity._embedded.employees,
-          attributes: _this4.state.attributes,
-          pageSize: _this4.state.pageSize,
+          attributes: _this5.state.attributes,
+          pageSize: _this5.state.pageSize,
           links: employeeCollection.entity._links
         });
       });
     }
   }, {
+    key: "componentDidMount",
+    value: function componentDidMount() {
+      this.loadFromServer(this.state.pageSize);
+    }
+  }, {
     key: "render",
     value: function render() {
-      return /*#__PURE__*/React.createElement(EmployeeList, {
-        employees: this.state.employees
-      });
+      return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(CreateDialog, {
+        attributes: this.state.attributes,
+        onCreate: this.onCreate
+      }), /*#__PURE__*/React.createElement(EmployeeList, {
+        employees: this.state.employees,
+        links: this.state.links,
+        pageSize: this.state.pageSize,
+        onNavigate: this.onNavigate,
+        onDelete: this.onDelete,
+        updatePageSize: this.updatePageSize
+      }));
     }
   }]);
 
@@ -34234,10 +34269,18 @@ var EmployeeList = /*#__PURE__*/function (_React$Component2) {
 
   var _super2 = _createSuper(EmployeeList);
 
-  function EmployeeList() {
+  function EmployeeList(props) {
+    var _this6;
+
     _classCallCheck(this, EmployeeList);
 
-    return _super2.apply(this, arguments);
+    _this6 = _super2.call(this, props);
+    _this6.handleNavFirst = _this6.handleNavFirst.bind(_assertThisInitialized(_this6));
+    _this6.handleNavPrev = _this6.handleNavPrev.bind(_assertThisInitialized(_this6));
+    _this6.handleNavNext = _this6.handleNavNext.bind(_assertThisInitialized(_this6));
+    _this6.handleNavLast = _this6.handleNavLast.bind(_assertThisInitialized(_this6));
+    _this6.handleInput = _this6.handleInput.bind(_assertThisInitialized(_this6));
+    return _this6;
   }
 
   _createClass(EmployeeList, [{
@@ -34265,18 +34308,31 @@ var EmployeeList = /*#__PURE__*/function (_React$Component2) {
       this.props.onNavigate(this.props.links.last.href);
     }
   }, {
+    key: "handleInput",
+    value: function handleInput(e) {
+      e.preventDefault();
+      var pageSize = ReactDOM.findDOMNode(this.refs.pageSize).value;
+
+      if (/^[0-9]+$/.test(pageSize)) {
+        this.props.updatePageSize(pageSize);
+      } else {
+        ReactDOM.findDOMNode(this.refs.pageSize).value = pageSize.substring(0, pageSize.length - 1);
+      }
+    }
+  }, {
     key: "render",
     value: function render() {
-      var _this5 = this;
+      var _this7 = this;
 
       var employees = this.props.employees.map(function (employee) {
         return /*#__PURE__*/React.createElement(Employee, {
           key: employee._links.self.href,
           employee: employee,
-          onDelete: _this5.props.onDelete
+          onDelete: _this7.props.onDelete
         });
       });
       var navLinks = [];
+      console.log(this.props);
 
       if ("first" in this.props.links) {
         navLinks.push( /*#__PURE__*/React.createElement("button", {
@@ -34322,16 +34378,27 @@ var Employee = /*#__PURE__*/function (_React$Component3) {
 
   var _super3 = _createSuper(Employee);
 
-  function Employee() {
+  function Employee(props) {
+    var _this8;
+
     _classCallCheck(this, Employee);
 
-    return _super3.apply(this, arguments);
+    _this8 = _super3.call(this, props);
+    _this8.handleDelete = _this8.handleDelete.bind(_assertThisInitialized(_this8));
+    return _this8;
   }
 
   _createClass(Employee, [{
+    key: "handleDelete",
+    value: function handleDelete() {
+      this.props.onDelete(this.props.employee);
+    }
+  }, {
     key: "render",
     value: function render() {
-      return /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, this.props.employee.firstName), /*#__PURE__*/React.createElement("td", null, this.props.employee.lastName), /*#__PURE__*/React.createElement("td", null, this.props.employee.description));
+      return /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, this.props.employee.firstName), /*#__PURE__*/React.createElement("td", null, this.props.employee.lastName), /*#__PURE__*/React.createElement("td", null, this.props.employee.description), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+        onClick: this.handleDelete
+      }, "Delete")));
     }
   }]);
 
@@ -34344,29 +34411,29 @@ var CreateDialog = /*#__PURE__*/function (_React$Component4) {
   var _super4 = _createSuper(CreateDialog);
 
   function CreateDialog(props) {
-    var _this6;
+    var _this9;
 
     _classCallCheck(this, CreateDialog);
 
-    _this6 = _super4.call(this, props);
-    _this6.handleSubmit = _this6.handleSubmit.bind(_assertThisInitialized(_this6));
-    return _this6;
+    _this9 = _super4.call(this, props);
+    _this9.handleSubmit = _this9.handleSubmit.bind(_assertThisInitialized(_this9));
+    return _this9;
   }
 
   _createClass(CreateDialog, [{
     key: "handleSubmit",
     value: function handleSubmit(e) {
-      var _this7 = this;
+      var _this10 = this;
 
       e.preventDefault();
       var newEmployee = {};
       this.props.attributes.forEach(function (attribute) {
-        newEmployee[attribute] = ReactDOM.findDOMNode(_this7.refs[attribute]).value.trim();
+        newEmployee[attribute] = ReactDOM.findDOMNode(_this10.refs[attribute]).value.trim();
       });
       this.props.onCreate(newEmployee); // clear out the dialog's inputs
 
       this.props.attributes.forEach(function (attribute) {
-        ReactDOM.findDOMNode(_this7.refs[attribute]).value = '';
+        ReactDOM.findDOMNode(_this10.refs[attribute]).value = '';
       }); // Navigate away from the dialog to hide it.
 
       window.location = "#";
@@ -34442,6 +34509,55 @@ module.exports = rest.wrap(mime, {
     'Accept': 'application/hal+json'
   }
 });
+
+/***/ }),
+
+/***/ "./src/main/js/follow.js":
+/*!*******************************!*\
+  !*** ./src/main/js/follow.js ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = function follow(api, rootPath, relArray) {
+  var root = api({
+    method: 'GET',
+    path: rootPath
+  });
+  return relArray.reduce(function (root, arrayItem) {
+    var rel = typeof arrayItem === 'string' ? arrayItem : arrayItem.rel;
+    return traverseNext(root, rel, arrayItem);
+  }, root);
+
+  function traverseNext(root, rel, arrayItem) {
+    return root.then(function (response) {
+      if (hasEmbeddedRel(response.entity, rel)) {
+        return response.entity._embedded[rel];
+      }
+
+      if (!response.entity._links) {
+        return [];
+      }
+
+      if (typeof arrayItem === 'string') {
+        return api({
+          method: 'GET',
+          path: response.entity._links[rel].href
+        });
+      } else {
+        return api({
+          method: 'GET',
+          path: response.entity._links[rel].href,
+          params: arrayItem.params
+        });
+      }
+    });
+  }
+
+  function hasEmbeddedRel(entity, rel) {
+    return entity._embedded && entity._embedded.hasOwnProperty(rel);
+  }
+};
 
 /***/ }),
 
